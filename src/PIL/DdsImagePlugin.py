@@ -310,12 +310,18 @@ class DdsImageFile(ImageFile.ImageFile):
         if pfflags & DDPF.RGB:
             # Texture contains uncompressed RGB data
             masks = {mask: ["R", "G", "B", "A"][i] for i, mask in enumerate(masks)}
-            rawmode = ""
-            if bitcount == 32:
-                rawmode += masks[0xFF000000]
-            else:
+            if bitcount == 8:
+                self.mode = "L"
+                rawmode = "L"
+            elif bitcount == 24:
                 self.mode = "RGB"
-            rawmode += masks[0xFF0000] + masks[0xFF00] + masks[0xFF]
+                rawmode = masks[0xFF0000] + masks[0xFF00] + masks[0xFF]
+            elif bitcount == 32:
+                self.mode = "RGBA"
+                rawmode = masks[0xFF000000] + masks[0xFF0000] + masks[0xFF00] + masks[0xFF]
+            else:
+                raise OSError(f'Unsupported bitcount {bitcount} for DDS texture')
+
 
             self.tile = [("raw", (0, 0) + self.size, 0, (rawmode[::-1], 0, 1))]
         elif pfflags & DDPF.FOURCC:
@@ -386,8 +392,21 @@ class DdsImageFile(ImageFile.ImageFile):
 
 
 def _save(im, fp, filename):
-    if im.mode not in ("RGB", "RGBA"):
+    if im.mode not in ("RGB", "RGBA", "L"):
         raise OSError(f"cannot write mode {im.mode} as DDS")
+
+    if im.mode == "RGB":
+        pixel_flags = DDPF.RGB
+        rgba_mask = o32(0x00FF0000) + o32(0x0000FF00) + o32(0x000000FF) + o32(0)
+        bit_count = 24
+    elif im.mode == "RGBA":
+        pixel_flags = DDPF.RGB | DDPF.ALPHAPIXELS
+        rgba_mask = o32(0x00FF0000) + o32(0x0000FF00) + o32(0x000000FF) + o32(0xFF000000)
+        bit_count = 32
+    else:  # im.mode == "L"
+        pixel_flags = DDPF.RGB
+        rgba_mask = o32(0xFF000000) + o32(0) + o32(0) + o32(0)
+        bit_count = 8
 
     fp.write(
         o32(DDS_MAGIC)
@@ -395,18 +414,15 @@ def _save(im, fp, filename):
         + o32(DDSD.CAPS | DDSD.HEIGHT | DDSD.WIDTH | DDSD.PITCH | DDSD.PIXELFORMAT)  # flags
         + o32(im.height)
         + o32(im.width)
-        + o32((im.width * (32 if im.mode == "RGBA" else 24) + 7) // 8)  # pitch
+        + o32((im.width * bit_count + 7) // 8)  # pitch
         + o32(0)  # depth
         + o32(0)  # mipmaps
         + o32(0) * 11  # reserved
         + o32(32)  # pfsize
-        + o32((DDPF.RGB | DDPF.ALPHAPIXELS) if im.mode == "RGBA" else DDPF.RGB)  # pfflags
+        + o32(pixel_flags)  # pfflags
         + o32(0)  # fourcc
-        + o32(32 if im.mode == "RGBA" else 24)  # bitcount
-        + o32(0xFF0000)  # rbitmask
-        + o32(0xFF00)  # gbitmask
-        + o32(0xFF)  # bbitmask
-        + o32(0xFF000000 if im.mode == "RGBA" else 0)  # abitmask
+        + o32(bit_count)  # bitcount
+        + rgba_mask  # dwRGBABitMask
         + o32(DDSCAPS.TEXTURE)  # dwCaps
         + o32(0)  # dwCaps2
         + o32(0)  # dwCaps3
