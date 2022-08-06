@@ -31,6 +31,7 @@ import io
 import itertools
 import struct
 import sys
+from typing import List
 
 from . import Image
 from ._util import is_path
@@ -506,29 +507,29 @@ def _save(im, fp, tile, bufsize=0):
         fp.flush()
 
 
-def _encode_tile(im, fp, tile, bufsize, fh, exc=None):
-    for e, b, o, a in tile:
-        if o > 0:
-            fp.seek(o)
-        encoder = Image._getencoder(im.mode, e, a, im.encoderconfig)
+def _encode_tile(im, fp, tile: List[Image.Tile], bufsize, fh, exc=None):
+    for encoder_name, extents, offset, tile_args in tile:
+        if offset > 0:
+            fp.seek(offset)
+        encoder = Image._getencoder(im.mode, encoder_name, tile_args, im.encoderconfig)
         try:
-            encoder.setimage(im.im, b)
+            encoder.setimage(im.im, extents)
             if encoder.pushes_fd:
                 encoder.setfd(fp)
-                l, s = encoder.encode_to_pyfd()
+                encoded_length, error_code = encoder.encode_to_pyfd()
             else:
                 if exc:
                     # compress to Python file-compatible object
                     while True:
-                        l, s, d = encoder.encode(bufsize)
-                        fp.write(d)
-                        if s:
+                        encoded_length, error_code, encoded_data = encoder.encode(bufsize)
+                        fp.write(encoded_data)
+                        if error_code:
                             break
                 else:
                     # slight speedup: compress to real file object
-                    s = encoder.encode_to_file(fh, bufsize)
-            if s < 0:
-                raise OSError(f"encoder error {s} when writing image file") from exc
+                    error_code = encoder.encode_to_file(fh, bufsize)
+            if error_code < 0:
+                raise OSError(f"encoder error {error_code} when writing image file") from exc
         finally:
             encoder.cleanup()
 
