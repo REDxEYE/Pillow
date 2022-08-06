@@ -430,45 +430,30 @@ def _save(im, fp, filename):
 
     if im.mode == "RGB":
         pixel_flags = DDPF.RGB
-        rgba_mask = o32(0x00FF0000) + o32(0x0000FF00) + o32(0x000000FF) + o32(0)
+        rgba_mask = struct.pack('<4I', 0x00FF0000, 0x0000FF00, 0x000000FF, 0)
         bit_count = 24
     elif im.mode == "RGBA":
         pixel_flags = DDPF.RGB | DDPF.ALPHAPIXELS
-        rgba_mask = (
-            o32(0x00FF0000) + o32(0x0000FF00) + o32(0x000000FF) + o32(0xFF000000)
-        )
+        rgba_mask = struct.pack('<4I', 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000)
         bit_count = 32
+        r, g, b, a = im.split()
+        im = Image.merge("RGBA", (a, r, g, b))
     else:  # im.mode == "L"
         pixel_flags = DDPF.RGB
-        rgba_mask = o32(0xFF000000) + o32(0) + o32(0) + o32(0)
+        rgba_mask = struct.pack('<4I', 0xFF000000, 0, 0, 0)
         bit_count = 8
+
+    flags = DDSD.CAPS | DDSD.HEIGHT | DDSD.WIDTH | DDSD.PITCH | DDSD.PIXELFORMAT
 
     fp.write(
         o32(DDS_MAGIC)
-        + o32(124)  # header size
-        + o32(
-            DDSD.CAPS | DDSD.HEIGHT | DDSD.WIDTH | DDSD.PITCH | DDSD.PIXELFORMAT
-        )  # flags
-        + o32(im.height)
-        + o32(im.width)
-        + o32((im.width * bit_count + 7) // 8)  # pitch
-        + o32(0)  # depth
-        + o32(0)  # mipmaps
-        + o32(0) * 11  # reserved
-        + o32(32)  # pfsize
-        + o32(pixel_flags)  # pfflags
-        + o32(0)  # fourcc
-        + o32(bit_count)  # bitcount
+        # header size, flags, height, width, pith, depth, mipmaps
+        + struct.pack('<IIIIIII', 124, flags, im.height, im.width, (im.width * bit_count + 7) // 8, 0, 0)
+        + struct.pack('11I', *((0,) * 11))  # reserved
+        + struct.pack('<IIII', 32, pixel_flags, 0, bit_count)  # pfsize, pfflags, fourcc, bitcount
         + rgba_mask  # dwRGBABitMask
-        + o32(DDSCAPS.TEXTURE)  # dwCaps
-        + o32(0)  # dwCaps2
-        + o32(0)  # dwCaps3
-        + o32(0)  # dwCaps4
-        + o32(0)  # dwReserved2
+        + struct.pack('<IIIII', DDSCAPS.TEXTURE, 0, 0, 0, 0)
     )
-    if im.mode == "RGBA":
-        r, g, b, a = im.split()
-        im = Image.merge("RGBA", (a, r, g, b))
     ImageFile._save(
         im, fp, [Image.Tile("raw", (0, 0) + im.size, 0, (im.mode[::-1], 0, 1))]
     )
