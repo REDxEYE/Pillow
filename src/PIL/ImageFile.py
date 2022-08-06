@@ -521,7 +521,9 @@ def _encode_tile(im, fp, tile: List[Image.Tile], bufsize, fh, exc=None):
                 if exc:
                     # compress to Python file-compatible object
                     while True:
-                        encoded_length, error_code, encoded_data = encoder.encode(bufsize)
+                        encoded_length, error_code, encoded_data = encoder.encode(
+                            bufsize
+                        )
                         fp.write(encoded_data)
                         if error_code:
                             break
@@ -529,7 +531,9 @@ def _encode_tile(im, fp, tile: List[Image.Tile], bufsize, fh, exc=None):
                     # slight speedup: compress to real file object
                     error_code = encoder.encode_to_file(fh, bufsize)
             if error_code < 0:
-                raise OSError(f"encoder error {error_code} when writing image file") from exc
+                raise OSError(
+                    f"encoder error {error_code} when writing image file"
+                ) from exc
         finally:
             encoder.cleanup()
 
