@@ -447,6 +447,7 @@ def _save(im, fp, filename):
 
 # fmt: on
 
+
 def _accept(prefix):
     return prefix[:4] == b"DDS "
 
