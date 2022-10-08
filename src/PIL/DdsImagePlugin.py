@@ -12,7 +12,6 @@ Full text of the CC0 license:
 import io
 import struct
 from enum import IntEnum, IntFlag
-from io import BytesIO
 
 from . import Image, ImageFile
 from ._binary import i32le as i32
@@ -283,7 +282,7 @@ class DdsImageFile(ImageFile.ImageFile):
         header_bytes = self.fp.read(header_size - 4)
         if len(header_bytes) != 120:
             raise OSError(f"Incomplete header: {len(header_bytes)} bytes")
-        header = BytesIO(header_bytes)
+        header = io.BytesIO(header_bytes)
 
         flags_, height, width = struct.unpack("<3I", header.read(12))
         flags = DDSD(flags_)
