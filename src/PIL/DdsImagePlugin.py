@@ -277,7 +277,6 @@ class DdsImageFile(ImageFile.ImageFile):
     format = "DDS"
     format_description = "DirectDraw Surface"
 
-    # fmt: off
     def _open(self):
         if not _accept(self.fp.read(4)):
             raise SyntaxError("not a DDS file")
@@ -313,10 +312,12 @@ class DdsImageFile(ImageFile.ImageFile):
                 self.tile = [("raw", extents, 0, (rawmode[::-1], 0, 1))]
             elif bitcount == 32 and pfflags & DDPF.ALPHAPIXELS:
                 self.mode = "RGBA"
-                rawmode = (masks[0xFF000000] +
-                           masks[0x00FF0000] +
-                           masks[0x0000FF00] +
-                           masks[0x000000FF])
+                rawmode = (
+                    masks[0xFF000000]
+                    + masks[0x00FF0000]
+                    + masks[0x0000FF00]
+                    + masks[0x000000FF]
+                )
                 self.tile = [("raw", extents, 0, (rawmode[::-1], 0, 1))]
             else:
                 raise OSError(f"Unsupported bitcount {bitcount} for {pfflags}")
@@ -398,15 +399,12 @@ class DdsImageFile(ImageFile.ImageFile):
         else:
             raise NotImplementedError(f"Unknown pixel format flags {repr(pfflags)}")
 
-    # fmt: on
-
     def load_seek(self, pos):
         pass
 
 
-# fmt: off
 def _save(im, fp, filename):
-    if im.mode not in ("RGB", "RGBA", "L", 'LA'):
+    if im.mode not in ("RGB", "RGBA", "L", "LA"):
         raise OSError(f"cannot write mode {im.mode} as DDS")
 
     pixel_flags = DDPF.RGB
@@ -419,7 +417,7 @@ def _save(im, fp, filename):
         bit_count = 32
         r, g, b, a = im.split()
         im = Image.merge("RGBA", (a, r, g, b))
-    elif im.mode == 'LA':
+    elif im.mode == "LA":
         pixel_flags = DDPF.LUMINANCE | DDPF.ALPHAPIXELS
         rgba_mask = struct.pack("<4I", 0x000000FF, 0x000000FF, 0x000000FF, 0x0000FF00)
         bit_count = 16
@@ -433,8 +431,16 @@ def _save(im, fp, filename):
     stride = (im.width * bit_count + 7) // 8
     fp.write(
         o32(DDS_MAGIC)
-        # header size, flags, height, width, pitch, depth, mipmaps
-        + struct.pack("<IIIIIII", 124, flags, im.height, im.width, stride, 0, 0, )
+        + struct.pack(
+            "<IIIIIII",
+            124,  # header size
+            flags,  # flags
+            im.height,
+            im.width,
+            stride,  # pitch
+            0,  # depth
+            0,  # mipmaps
+        )
         + struct.pack("11I", *((0,) * 11))  # reserved
         # pfsize, pfflags, fourcc, bitcount
         + struct.pack("<IIII", 32, pixel_flags, 0, bit_count)
@@ -443,9 +449,6 @@ def _save(im, fp, filename):
     )
     mode = "LA" if im.mode == "LA" else im.mode[::-1]
     ImageFile._save(im, fp, [Image.Tile("raw", (0, 0) + im.size, 0, (mode, 0, 1))])
-
-
-# fmt: on
 
 
 def _accept(prefix):
